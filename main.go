@@ -11,8 +11,13 @@ import (
 	"time"
 )
 
+const folder = "2022"
+
 func main() {
 	baseURL := "https://access.redhat.com/security/data/csaf/beta/vex/2022/"
+
+	// Define the maximum number of files to download
+	maxFiles := 30
 
 	// Make GET request to the base URL
 	resp, err := http.Get(baseURL)
@@ -23,7 +28,7 @@ func main() {
 	defer resp.Body.Close()
 
 	// Create a directory to store the downloaded files
-	err = os.MkdirAll("", 0755)
+	err = os.MkdirAll(folder, 0755)
 	if err != nil {
 		fmt.Println("Error creating directory:", err)
 		return
@@ -31,31 +36,33 @@ func main() {
 
 	// Decode the HTML response to find the links
 	buf := make([]byte, 4096)
+	downloadedFiles := 0
 	for {
 		n, err := resp.Body.Read(buf)
 		if err != nil && err != io.EOF {
 			fmt.Println("Error reading response:", err)
 			return
 		}
-		if n == 0 {
+		if n == 0 || downloadedFiles >= maxFiles {
 			break
 		}
 
 		// Find links ending with ".json"
 		links := findJSONLinks(buf[:n])
 		for _, link := range links {
-			filename := filepath.Join("downloaded_files", filepath.Base(link))
+			filename := filepath.Join(folder, filepath.Base(link))
 			err := downloadFile(baseURL+link, filename)
 			if err != nil {
 				fmt.Println("Error downloading file:", err)
 			} else {
 				fmt.Println("File downloaded:", filename)
+				downloadedFiles++
+				if downloadedFiles >= maxFiles {
+					break
+				}
 			}
 		}
 	}
-
-	// Define the path to the "2022" folder
-	folder := "2022"
 
 	// Create the index.txt file
 	err = createIndexFile(folder)
